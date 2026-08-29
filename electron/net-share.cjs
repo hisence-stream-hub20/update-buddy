@@ -302,4 +302,29 @@ async function stop() {
   return { ok: true, running: false };
 }
 
-module.exports = { adapters, status, start, route, stop };
+/**
+ * Changes the Wi-Fi name / password from inside the app.
+ * Windows only applies a new passphrase when tethering is restarted, so when the
+ * hotspot is already on it is stopped and started again with the new values and
+ * the VPN route is re-bound automatically.
+ * options: { ssid?, password?, publicAdapter?, privateAdapter? }
+ */
+async function update(options = {}) {
+  if (!WIN) return { ok: false, error: NOT_WINDOWS };
+  const ssid = String(options.ssid || state.ssid || "UMS-TV").slice(0, 32);
+  const password = String(options.password || state.password || "");
+  if (password.length < 8) return { ok: false, error: "رمز وای‌فای باید حداقل ۸ نویسه باشد." };
+
+  const wasRunning = (await status()).running;
+  if (wasRunning) await ps(HOTSPOT_STOP_SCRIPT, 40000);
+  const res = await start({
+    ssid,
+    password,
+    publicAdapter: options.publicAdapter || state.publicAdapter,
+    privateAdapter: options.privateAdapter || state.privateAdapter,
+  });
+  if (!res.ok) return res;
+  return { ...res, ok: true, changed: true, ssid, note: res.note || `نام و رمز وای‌فای به‌روزرسانی شد (${ssid}).` };
+}
+
+module.exports = { adapters, status, start, route, stop, update };
