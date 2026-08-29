@@ -129,4 +129,55 @@ if (!existsSync(netConfig)) {
   console.log("فایل network_security_config.xml ساخته شد:", dirname(netConfig));
 }
 
+// ---- second launcher icon: کنترل‌پنل ------------------------------------
+// Copies PanelActivity + its icon and registers it in the manifest as a second
+// launcher. It uses its own taskAffinity so the two icons never close each other.
+const panelSource = join(root, "native", "android", "PanelActivity.java");
+if (existsSync(panelSource)) {
+  writeFileSync(join(javaRoot, "PanelActivity.java"), readFileSync(panelSource, "utf8"), "utf8");
+  console.log("اکتیویتی پنل کپی شد:", join(javaRoot, "PanelActivity.java"));
+
+  const iconRoot = join(root, "native", "android", "panel-icon");
+  if (existsSync(iconRoot)) {
+    for (const bucket of readdirSync(iconRoot)) {
+      const dest = join(androidRoot, "app", "src", "main", "res", bucket);
+      mkdirSync(dest, { recursive: true });
+      for (const file of readdirSync(join(iconRoot, bucket))) {
+        writeFileSync(join(dest, file), readFileSync(join(iconRoot, bucket, file)));
+      }
+    }
+    console.log("آیکن کنترل‌پنل در res کپی شد.");
+  }
+
+  if (existsSync(manifestPath)) {
+    let manifest = readFileSync(manifestPath, "utf8");
+    if (!manifest.includes(".PanelActivity")) {
+      manifest = manifest.replace(
+        /<\/application>/,
+        `        <activity
+            android:name=".PanelActivity"
+            android:label="کنترل‌پنل مدیا سرور"
+            android:icon="@mipmap/ic_panel"
+            android:roundIcon="@mipmap/ic_panel"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.lovable.universalmediaserver.panel"
+            android:excludeFromRecents="false"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>`,
+      );
+      writeFileSync(manifestPath, manifest, "utf8");
+      console.log("آیکن دوم (کنترل‌پنل) در manifest ثبت شد.");
+    } else {
+      console.log("آیکن دوم از قبل در manifest ثبت شده است.");
+    }
+  }
+}
+
 console.log("نصب پلاگین بومی کامل شد.");
