@@ -102,6 +102,25 @@ contextBridge.exposeInMainWorld("ums", {
   remoteSetFlags: (payload) => invoke("ums:remoteSetFlags", payload),
   remoteUrl: () => invoke("ums:remoteUrl"),
 
+  // Wi-Fi sharing of this computer's internet (VPN tunnel) with the TV/phones
+  netShareStatus: () => invoke("ums:netShareStatus"),
+  netShareAdapters: () => invoke("ums:netShareAdapters"),
+  netShareStart: (payload) => invoke("ums:netShareStart", payload),
+  netShareUpdate: (payload) => invoke("ums:netShareUpdate", payload),
+  netShareRoute: (payload) => invoke("ums:netShareRoute", payload),
+  netShareStop: () => invoke("ums:netShareStop"),
+
+  // Volume of the computer the app is installed on (separate from TV volume)
+  localVolume: () => invoke("ums:localVolume"),
+  setLocalVolume: (volume) => invoke("ums:setLocalVolume", volume),
+  setLocalMute: (mute) => invoke("ums:setLocalMute", mute),
+
+  // Second desktop icon: independent always-on-top controller window
+  openPanel: () => invoke("ums:openPanel"),
+  closePanel: () => invoke("ums:closePanel"),
+  isPanelWindow: () => invoke("ums:isPanelWindow"),
+  showMainWindow: () => invoke("ums:showMainWindow"),
+
   openExternal: (url) => invoke("ums:openExternal", url),
   // Hands a saved / direct link to the VLC player installed on this machine.
   openInVlc: (url) => invoke("ums:openInVlc", url),

@@ -191,6 +191,41 @@ export type ScreenMetrics = {
   hw?: string;
 };
 
+export type NetAdapter = {
+  name: string;
+  description: string;
+  up: boolean;
+  vpn: boolean;
+  wireless: boolean;
+};
+
+export type NetShareStatus = {
+  ok: boolean;
+  running: boolean;
+  ssid?: string;
+  password?: string;
+  clients?: number;
+  publicAdapter?: string;
+  privateAdapter?: string;
+  note?: string;
+  error?: string;
+  /** Windows only: is the app running with administrator rights? */
+  elevated?: boolean;
+};
+
+export type NetShareResult = {
+  ok: boolean;
+  running?: boolean;
+  ssid?: string;
+  publicAdapter?: string;
+  privateAdapter?: string;
+  note?: string;
+  error?: string;
+  changed?: boolean;
+};
+
+export type LocalVolume = { ok: boolean; volume?: number; muted?: boolean; error?: string };
+
 export type UmsApi = {
   isDesktop: true;
   platform: string;
@@ -353,6 +388,35 @@ export type UmsApi = {
   }): Promise<{ subtitle: boolean; dub: boolean; current: string }>;
   /** Desktop only: URL of the on-TV control panel (open it in the TV browser). */
   remoteUrl?(): Promise<string>;
+  /** Desktop only: network adapters, with the VPN ones flagged. */
+  netShareAdapters?(): Promise<{ ok: boolean; error?: string; adapters: NetAdapter[] }>;
+  /** Desktop only: hotspot state (SSID, clients, chosen adapters, admin rights). */
+  netShareStatus?(): Promise<NetShareStatus>;
+  /** Desktop only: turns the Wi-Fi hotspot on and routes it through the VPN. */
+  netShareStart?(p?: {
+    ssid?: string;
+    password?: string;
+    publicAdapter?: string;
+    privateAdapter?: string;
+  }): Promise<NetShareResult>;
+  /** Desktop only: changes the hotspot name/password (restarts it if needed). */
+  netShareUpdate?(p: { ssid?: string; password?: string }): Promise<NetShareResult>;
+  /** Desktop only: re-binds the VPN adapter to the hotspot adapter. */
+  netShareRoute?(p?: {
+    publicAdapter?: string;
+    privateAdapter?: string;
+  }): Promise<NetShareResult>;
+  /** Desktop only: turns hotspot + internet sharing off. */
+  netShareStop?(): Promise<NetShareResult>;
+  /** Desktop only: master volume of this computer (0..100). */
+  localVolume?(): Promise<LocalVolume>;
+  setLocalVolume?(volume: number): Promise<LocalVolume>;
+  setLocalMute?(mute: boolean): Promise<LocalVolume>;
+  /** Desktop only: opens/closes the independent controller window. */
+  openPanel?(): Promise<{ ok: boolean }>;
+  closePanel?(): Promise<{ ok: boolean }>;
+  isPanelWindow?(): Promise<boolean>;
+  showMainWindow?(): Promise<{ ok: boolean }>;
   onEvent(
     handler: (data: { type: string; to?: string } & Record<string, unknown>) => void,
   ): () => void;
