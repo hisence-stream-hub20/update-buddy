@@ -23,6 +23,11 @@ const hostKeys = require("./host-keys.cjs");
 const health = require("./health-monitor.cjs");
 const deps = require("./deps.cjs");
 const plugins = require("./plugins.cjs");
+// Wi-Fi hotspot + Internet Connection Sharing (sends the VPN tunnel to the TV).
+const netShare = require("./net-share.cjs");
+// Master volume of this computer (separate slider from the TV volume).
+const systemVolume = require("./system-volume.cjs");
+
 
 
 const PORT = Number(process.env.UMS_PORT || 8080);
