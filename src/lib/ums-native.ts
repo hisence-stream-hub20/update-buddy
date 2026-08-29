@@ -23,6 +23,11 @@ type NativePlugin = {
   setMute(o: Record<string, unknown>): Promise<SoapResult>;
   deviceState(o: Record<string, unknown>): Promise<PlaybackState>;
   openInVlc?(o: { url: string }): Promise<{ ok: boolean; error?: string }>;
+  openTethering?(): Promise<{ ok: boolean; error?: string }>;
+  openVpnSettings?(): Promise<{ ok: boolean; error?: string }>;
+  localVolume?(): Promise<{ ok: boolean; volume?: number; muted?: boolean; error?: string }>;
+  setLocalVolume?(o: { volume: number }): Promise<{ ok: boolean; volume?: number; muted?: boolean }>;
+  setLocalMute?(o: { mute: boolean }): Promise<{ ok: boolean; volume?: number; muted?: boolean }>;
 };
 
 const MOBILE_ONLY =
@@ -66,6 +71,17 @@ export function getNativeUms(): UmsApi | null {
     setMute: async (p: DeviceTarget & Record<string, unknown>) => (p.controlUrl ? native.setMute(p) : unavailable()),
     deviceState: async (p: DeviceTarget & Record<string, unknown>) =>
       p.controlUrl ? native.deviceState(p) : { ok: false, error: MOBILE_ONLY },
+    // Phone hotspot + phone speaker volume (used by the controller panel).
+    openTethering: async () =>
+      native.openTethering ? native.openTethering() : { ok: false, error: MOBILE_ONLY },
+    openVpnSettings: async () =>
+      native.openVpnSettings ? native.openVpnSettings() : { ok: false, error: MOBILE_ONLY },
+    localVolume: async () =>
+      native.localVolume ? native.localVolume() : { ok: false, error: MOBILE_ONLY },
+    setLocalVolume: async (volume: number) =>
+      native.setLocalVolume ? native.setLocalVolume({ volume }) : { ok: false, error: MOBILE_ONLY },
+    setLocalMute: async (mute: boolean) =>
+      native.setLocalMute ? native.setLocalMute({ mute }) : { ok: false, error: MOBILE_ONLY },
     // Playlists are parsed in the app itself on Android (no Node backend).
     loadPlaylist: async ({ source }: { source: string }) => {
       try {

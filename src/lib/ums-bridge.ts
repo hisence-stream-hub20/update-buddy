@@ -412,6 +412,10 @@ export type UmsApi = {
   localVolume?(): Promise<LocalVolume>;
   setLocalVolume?(volume: number): Promise<LocalVolume>;
   setLocalMute?(mute: boolean): Promise<LocalVolume>;
+  /** Android only: opens the phone's hotspot/tethering page. */
+  openTethering?(): Promise<{ ok: boolean; error?: string }>;
+  /** Android only: opens the phone's VPN settings page. */
+  openVpnSettings?(): Promise<{ ok: boolean; error?: string }>;
   /** Desktop only: opens/closes the independent controller window. */
   openPanel?(): Promise<{ ok: boolean }>;
   closePanel?(): Promise<{ ok: boolean }>;
