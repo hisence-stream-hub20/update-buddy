@@ -40,6 +40,8 @@ const UPDATE_URL = "https://github.com/";
 let serverProcess = null;
 let splashWindow = null;
 let mainWindow = null;
+// True when this process was launched from the second desktop icon (--panel).
+const PANEL_ARG = process.argv.includes("--panel");
 
 // ---------------------------------------------------------------- media state
 
@@ -69,6 +71,10 @@ const mediaState = {
     previewDelayMs: 0,
     // Logo splash on the TV whenever the picture is not there yet.
     tvSplash: true,
+    // ---- Wi-Fi sharing of the VPN internet (hotspot for the TV / phones)
+    hotspotSsid: "UMS-TV",
+    hotspotPassword: "12345678",
+    hotspotAutoRoute: true,
   },
   uuid: "uuid:2f402f80-da50-11e1-9b23-0017880a1b2c",
   devices: [],
@@ -96,8 +102,12 @@ function saveSettings() {
   }
 }
 
+let panelWindow = null;
+
 function emit(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("ums:event", payload);
+  // The separate control-panel window listens to the very same events.
+  if (panelWindow && !panelWindow.isDestroyed()) panelWindow.webContents.send("ums:event", payload);
 }
 
 function activeIp() {
