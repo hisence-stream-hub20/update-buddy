@@ -1181,7 +1181,25 @@ function createWindow(ok) {
   return win;
 }
 
+// One process only. Clicking the second desktop icon ("--panel") while the app
+// is already running just opens the controller window on top of it instead of
+// starting a second copy (which would fight over the media server port).
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (_e, argv) => {
+    if (argv.includes("--panel")) {
+      createPanelWindow();
+    } else if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 app.whenReady().then(async () => {
+  if (!gotLock) return;
   loadSettings();
   // Helper binaries + download folder must exist before any button is pressed.
   tools.setUserDataDir(app.getPath("userData"));
@@ -1224,6 +1242,8 @@ app.whenReady().then(async () => {
   const remaining = SPLASH_MS - (Date.now() - splashStarted);
   if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
   createWindow(ok);
+  // Launched straight from the controller icon: show the panel as well.
+  if (PANEL_ARG) createPanelWindow();
   // Safety net: never leave the splash hanging if the page never becomes ready.
   setTimeout(closeSplash, 20000);
   app.on("activate", () => {
