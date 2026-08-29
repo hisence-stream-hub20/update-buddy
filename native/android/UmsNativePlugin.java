@@ -1,6 +1,8 @@
 package app.lovable.universalmediaserver;
 
+import android.content.Context;
 import android.content.Intent;
+import android.media.AudioManager;
 import android.net.Uri;
 
 import com.getcapacitor.JSArray;
@@ -650,6 +652,121 @@ public class UmsNativePlugin extends Plugin {
         JSObject ret = new JSObject();
         ret.put("ok", true);
         return ret;
+    }
+
+    // ------------------------------------------------- internet sharing (phone)
+
+    /**
+     * Opens Android's own tethering/hotspot page. The phone shares its data (and
+     * the VPN tunnel, when the VPN app allows hotspot traffic) with the TV.
+     */
+    @PluginMethod
+    public void openTethering(PluginCall call) {
+        JSObject ret = new JSObject();
+        String[] targets = new String[] {
+            "com.android.settings.TetherSettings",
+            "com.android.settings.Settings$TetherSettingsActivity",
+            "com.android.settings.wifi.tether.WifiTetherSettingActivity"
+        };
+        for (String cls : targets) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_MAIN);
+                intent.setClassName("com.android.settings", cls);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(intent);
+                ret.put("ok", true);
+                call.resolve(ret);
+                return;
+            } catch (Exception ignored) {
+                // try the next known activity name
+            }
+        }
+        try {
+            Intent fallback = new Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS);
+            fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(fallback);
+            ret.put("ok", true);
+        } catch (Exception e) {
+            ret.put("ok", false);
+            ret.put("error", "صفحه هات‌اسپات باز نشد؛ از تنظیمات گوشی آن را روشن کنید.");
+        }
+        call.resolve(ret);
+    }
+
+    /** Opens the VPN settings page so the tunnel can be connected first. */
+    @PluginMethod
+    public void openVpnSettings(PluginCall call) {
+        JSObject ret = new JSObject();
+        try {
+            Intent intent = new Intent(android.provider.Settings.ACTION_VPN_SETTINGS);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(intent);
+            ret.put("ok", true);
+        } catch (Exception e) {
+            ret.put("ok", false);
+            ret.put("error", "صفحه VPN باز نشد.");
+        }
+        call.resolve(ret);
+    }
+
+    // ------------------------------------------------------ this phone's volume
+
+    private JSObject volumeReport(AudioManager am) {
+        JSObject ret = new JSObject();
+        int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int cur = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+        ret.put("ok", true);
+        ret.put("volume", max > 0 ? Math.round(cur * 100f / max) : 0);
+        ret.put("muted", cur == 0);
+        return ret;
+    }
+
+    @PluginMethod
+    public void localVolume(PluginCall call) {
+        AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) {
+            call.resolve(fail("کنترل صدای گوشی در دسترس نیست."));
+            return;
+        }
+        call.resolve(volumeReport(am));
+    }
+
+    @PluginMethod
+    public void setLocalVolume(PluginCall call) {
+        AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) {
+            call.resolve(fail("کنترل صدای گوشی در دسترس نیست."));
+            return;
+        }
+        int percent = clamp(call.getInt("volume", 50), 0, 100);
+        int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        try {
+            am.setStreamVolume(AudioManager.STREAM_MUSIC, Math.round(percent * max / 100f), 0);
+        } catch (Exception e) {
+            call.resolve(fail(message(e)));
+            return;
+        }
+        call.resolve(volumeReport(am));
+    }
+
+    @PluginMethod
+    public void setLocalMute(PluginCall call) {
+        AudioManager am = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (am == null) {
+            call.resolve(fail("کنترل صدای گوشی در دسترس نیست."));
+            return;
+        }
+        boolean mute = Boolean.TRUE.equals(call.getBoolean("mute", false));
+        try {
+            am.adjustStreamVolume(
+                AudioManager.STREAM_MUSIC,
+                mute ? AudioManager.ADJUST_MUTE : AudioManager.ADJUST_UNMUTE,
+                0);
+        } catch (Exception e) {
+            call.resolve(fail(message(e)));
+            return;
+        }
+        call.resolve(volumeReport(am));
     }
 
     private JSObject fail(String error) {
