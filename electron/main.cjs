@@ -186,6 +186,79 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function registerIpc() {
   ipcMain.handle("ums:getStatus", () => serverStatus());
+
+  // ---------------------------------------------------- Wi-Fi internet sharing
+  // Sends this computer's internet (VPN tunnel included) to the TV / phones by
+  // turning the PC into a Wi-Fi router. Needs "Run as administrator".
+  ipcMain.handle("ums:netShareAdapters", () => netShare.adapters());
+  ipcMain.handle("ums:netShareStatus", async () => {
+    const live = await netShare.status();
+    return {
+      ...live,
+      ssid: live.ssid || mediaState.settings.hotspotSsid,
+      password: live.password || mediaState.settings.hotspotPassword,
+      elevated: isElevated(),
+    };
+  });
+  ipcMain.handle("ums:netShareStart", async (_e, p) => {
+    const ssid = String(p?.ssid || mediaState.settings.hotspotSsid || "UMS-TV");
+    const password = String(p?.password || mediaState.settings.hotspotPassword || "");
+    mediaState.settings.hotspotSsid = ssid;
+    mediaState.settings.hotspotPassword = password;
+    saveSettings();
+    const res = await netShare.start({ ...(p || {}), ssid, password });
+    emit({ type: "net-share", ...res });
+    return res;
+  });
+  ipcMain.handle("ums:netShareUpdate", async (_e, p) => {
+    const ssid = String(p?.ssid || mediaState.settings.hotspotSsid || "UMS-TV");
+    const password = String(p?.password || mediaState.settings.hotspotPassword || "");
+    if (password.length < 8) return { ok: false, error: "رمز وای‌فای باید حداقل ۸ نویسه باشد." };
+    mediaState.settings.hotspotSsid = ssid;
+    mediaState.settings.hotspotPassword = password;
+    saveSettings();
+    const res = await netShare.update({ ...(p || {}), ssid, password });
+    emit({ type: "net-share", ...res });
+    return res;
+  });
+  ipcMain.handle("ums:netShareRoute", (_e, p) => netShare.route(p || {}));
+  ipcMain.handle("ums:netShareStop", async () => {
+    const res = await netShare.stop();
+    emit({ type: "net-share", ...res });
+    return res;
+  });
+
+  // ------------------------------------------------- this computer's own sound
+  ipcMain.handle("ums:localVolume", () => systemVolume.get());
+  ipcMain.handle("ums:setLocalVolume", (_e, p) =>
+    systemVolume.set(typeof p === "number" ? p : p?.volume),
+  );
+  ipcMain.handle("ums:setLocalMute", (_e, p) =>
+    systemVolume.mute(typeof p === "boolean" ? p : p?.mute === true),
+  );
+
+  // ------------------------------------------------------- second desktop icon
+  ipcMain.handle("ums:isPanelWindow", (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    return Boolean(panelWindow && win && win.id === panelWindow.id);
+  });
+  ipcMain.handle("ums:openPanel", () => {
+    createPanelWindow();
+    return { ok: true };
+  });
+  ipcMain.handle("ums:closePanel", (e) => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    if (win && panelWindow && win.id === panelWindow.id) win.close();
+    return { ok: true };
+  });
+  ipcMain.handle("ums:showMainWindow", () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+      return { ok: true };
+    }
+    return { ok: false };
+  });
   ipcMain.handle("ums:getNetwork", () => ({
     ip: ssdp.primaryIPv4(),
     interfaces: ssdp.localIPv4List(),
@@ -966,6 +1039,69 @@ function buildMenu() {
     },
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+/** True when the app runs elevated (needed for Internet Connection Sharing). */
+function isElevated() {
+  if (process.platform !== "win32") return true;
+  try {
+    // "net session" only succeeds for an administrator token.
+    require("node:child_process").execFileSync("net", ["session"], {
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The small always-on-top controller opened by the SECOND desktop icon.
+ * It is an independent window: closing it never closes the main app, and the
+ * main window keeps running behind it (they share this one process).
+ */
+function createPanelWindow() {
+  if (panelWindow && !panelWindow.isDestroyed()) {
+    panelWindow.show();
+    panelWindow.focus();
+    return panelWindow;
+  }
+  const iconPath = path.join(__dirname, "..", "public", "panel-icon.ico");
+  const win = new BrowserWindow({
+    width: 430,
+    height: 780,
+    minWidth: 360,
+    minHeight: 560,
+    show: false,
+    frame: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    backgroundColor: "#0a1024",
+    autoHideMenuBar: true,
+    title: "کنترل‌پنل مدیا سرور",
+    ...(fs.existsSync(iconPath) ? { icon: iconPath } : {}),
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      preload: path.join(__dirname, "preload.cjs"),
+    },
+  });
+  panelWindow = win;
+  win.setMenu(null);
+  win.loadURL(`${APP_URL}/panel`);
+  win.once("ready-to-show", () => {
+    closeSplash();
+    win.show();
+  });
+  win.on("closed", () => {
+    if (panelWindow === win) panelWindow = null;
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: "deny" };
+  });
+  return win;
 }
 
 function createWindow(ok) {
